@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IT CLUB — ACCESS TERMINAL</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --green:  #00ff88;
+  --cyan:   #00e5ff;
+  --red:    #ff2d55;
+  --gold:   #ffd700;
+  --bg:     #020408;
+  --glow-g: 0 0 16px rgba(0,255,136,.7), 0 0 48px rgba(0,255,136,.18);
+  --glow-c: 0 0 16px rgba(0,229,255,.7), 0 0 48px rgba(0,229,255,.18);
+  --glow-au:0 0 18px rgba(255,215,0,.8), 0 0 56px rgba(255,165,0,.22);
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); font-family:'Share Tech Mono',monospace; cursor:crosshair; }
+
+/* ─── Background layers ─── */
+#matrix { position:fixed; inset:0; z-index:0; opacity:.15; pointer-events:none; }
+
+.grid { position:fixed; inset:0; z-index:1; pointer-events:none;
+  background-image: linear-gradient(rgba(0,255,136,.04) 1px,transparent 1px),
+                    linear-gradient(90deg,rgba(0,255,136,.04) 1px,transparent 1px);
+  background-size:44px 44px; transition:background-image 1.2s; }
+.grid.gold {
+  background-image: linear-gradient(rgba(255,215,0,.06) 1px,transparent 1px),
+                    linear-gradient(90deg,rgba(255,215,0,.06) 1px,transparent 1px); }
+
+.scan { position:fixed; inset:0; z-index:2; pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.11) 2px,rgba(0,0,0,.11) 4px); }
+
+/* ─── Corners ─── */
+.corner { position:fixed; width:54px; height:54px; z-index:6; pointer-events:none; transition:border-color .9s,box-shadow .9s; }
+.corner.tl { top:16px; left:16px;   border-top:2px solid var(--green); border-left:2px solid var(--green);   box-shadow:-3px -3px 14px rgba(0,255,136,.28); }
+.corner.tr { top:16px; right:16px;  border-top:2px solid var(--green); border-right:2px solid var(--green);  box-shadow: 3px -3px 14px rgba(0,255,136,.28); }
+.corner.bl { bottom:16px; left:16px;  border-bottom:2px solid var(--green); border-left:2px solid var(--green);  box-shadow:-3px 3px 14px rgba(0,255,136,.28); }
+.corner.br { bottom:16px; right:16px; border-bottom:2px solid var(--green); border-right:2px solid var(--green); box-shadow: 3px 3px 14px rgba(0,255,136,.28); }
+.corner.gold { border-color:var(--gold)!important; box-shadow:0 0 22px rgba(255,215,0,.44)!important; }
+
+/* ─── Status bar ─── */
+#sb { position:fixed; bottom:13px; left:50%; transform:translateX(-50%); z-index:7;
+  font-size:10px; letter-spacing:3px; color:rgba(0,255,136,.38);
+  white-space:nowrap; pointer-events:none; transition:color .9s; }
+#sb.gold { color:rgba(255,215,0,.44); }
+
+/* ─── Page system ─── */
+.page { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; opacity:0; pointer-events:none;
+  transition:opacity .55s ease; overflow-y:auto; padding:24px 20px 64px; }
+.page.show { opacity:1; pointer-events:all; }
+
+/* ══════════════════════════════════════════
+   PAGE 1 — LOGIN
+══════════════════════════════════════════ */
+.tag { font-size:11px; letter-spacing:8px; color:rgba(0,255,136,.45); margin-bottom:10px;
+  animation:pulse 3s ease-in-out infinite; }
+
+.logo { font-family:'VT323',monospace; font-size:clamp(74px,17vw,152px);
+  color:var(--green); letter-spacing:14px; line-height:1;
+  text-shadow:var(--glow-g); position:relative; user-select:none;
+  animation:glitch 6s infinite; }
+.logo::before { content:attr(data-t); position:absolute; inset:0;
+  color:var(--red); clip-path:polygon(0 0,100% 0,100% 42%,0 42%);
+  animation:gr 6s infinite; }
+.logo::after  { content:attr(data-t); position:absolute; inset:0;
+  color:var(--cyan); clip-path:polygon(0 58%,100% 58%,100% 100%,0 100%);
+  animation:gb 6s infinite; }
+@keyframes glitch { 0%,90%,100%{transform:translate(0)} 91%{transform:translate(-3px,1px)} 92%{transform:translate(3px,-1px)} 93%{transform:translate(-2px,2px)} }
+@keyframes gr { 0%,90%,100%{transform:translate(0);opacity:0} 91%{transform:translate(5px,-2px);opacity:.7} 92%{transform:translate(-4px,2px);opacity:.7} 93%{opacity:0} }
+@keyframes gb { 0%,90%,100%{transform:translate(0);opacity:0} 91%{transform:translate(-5px,2px);opacity:.7} 92%{transform:translate(4px,-2px);opacity:.7} 93%{opacity:0} }
+
+.sys-sub { font-size:12px; letter-spacing:5px; color:rgba(0,229,255,.52); margin:6px 0 36px; }
+
+/* ─── Digit row ─── */
+.drow { display:flex; gap:8px; justify-content:center; cursor:text; }
+.db {
+  width:56px; height:68px;
+  background:rgba(0,255,136,.04); border:1px solid rgba(0,255,136,.18);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'VT323',monospace; font-size:40px; line-height:1;
+  color:var(--green); text-shadow:var(--glow-g);
+  position:relative; transition:border-color .15s,background .15s,box-shadow .15s;
+  user-select:none;
+}
+.db.cur  { border-color:var(--green); background:rgba(0,255,136,.09); box-shadow:0 0 14px rgba(0,255,136,.26); }
+.db.fill { border-color:rgba(0,255,136,.55); background:rgba(0,255,136,.06); }
+.db.err  { border-color:var(--red)!important; background:rgba(255,45,85,.09)!important; color:var(--red)!important; animation:shake .42s; }
+.caret   { position:absolute; bottom:9px; left:50%; transform:translateX(-50%);
+  width:20px; height:2px; background:var(--green); box-shadow:var(--glow-g);
+  animation:blink 1s step-end infinite; }
+@keyframes blink  { 0%,100%{opacity:1} 50%{opacity:0} }
+@keyframes shake  { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+
+.real { position:absolute; width:1px; height:1px; opacity:0; border:none; outline:none; pointer-events:none; top:0; left:0; }
+
+/* ─── Hint box ─── */
+.hint-box {
+  margin-top: 28px;
+  width: min(480px, 92vw);
+  border: 1px solid rgba(0,229,255,.35);
+  background: rgba(0,229,255,.05);
+  padding: 14px 22px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  animation: hint-glow 3s ease-in-out infinite;
+}
+@keyframes hint-glow {
+  0%,100% { border-color:rgba(0,229,255,.25); box-shadow:none; }
+  50%     { border-color:rgba(0,229,255,.65); box-shadow:0 0 18px rgba(0,229,255,.18); }
+}
+.hint-title { font-size:10px; letter-spacing:7px; color:rgba(0,229,255,.5); }
+.hint-val   {
+  font-family:'VT323',monospace; font-size:36px;
+  color:var(--cyan); text-shadow:var(--glow-c);
+  letter-spacing:5px;
+  animation:hint-text-pulse 3s ease-in-out infinite;
+}
+@keyframes hint-text-pulse {
+  0%,100%{ opacity:.7; } 50%{ opacity:1; text-shadow: var(--glow-c), 0 0 30px rgba(0,229,255,.4); }
+}
+.hint-desc  { font-size:11px; letter-spacing:3px; color:rgba(0,229,255,.38); }
+
+/* ─── Error / status lines ─── */
+.err { height:15px; font-size:11px; letter-spacing:3px; color:var(--red);
+  margin-top:10px; opacity:0; transition:opacity .22s; }
+.err.show { opacity:1; }
+
+.input-note { font-size:10px; letter-spacing:4px; color:rgba(0,255,136,.3); margin-top:8px; }
+
+/* ─── Authenticate button ─── */
+.btn {
+  margin-top:22px; padding:14px 48px;
+  background:transparent; border:2px solid var(--green);
+  color:var(--green); font-family:'VT323',monospace;
+  font-size:26px; letter-spacing:6px;
+  cursor:pointer; position:relative; overflow:hidden;
+  transition:color .28s; box-shadow:var(--glow-g); outline:none;
+}
+.btn::before { content:''; position:absolute; inset:0;
+  background:var(--green); transform:translateX(-101%); transition:transform .26s ease; z-index:0; }
+.btn > span  { position:relative; z-index:1; }
+.btn:hover   { color:var(--bg); }
+.btn:hover::before { transform:translateX(0); }
+.btn:active  { transform:scale(.97); }
+
+/* ══════════════════════════════════════════
+   PAGE 2 — LEVEL 2 (code 13371337)
+══════════════════════════════════════════ */
+.badge { font-size:10px; letter-spacing:8px; color:var(--cyan); margin-bottom:8px;
+  animation:pulse 2s ease-in-out infinite; }
+
+.big-h { font-family:'VT323',monospace; font-size:clamp(46px,10vw,84px);
+  color:var(--green); text-shadow:var(--glow-g); line-height:1.05; }
+
+.big-s { font-family:'VT323',monospace; font-size:clamp(20px,5vw,36px);
+  color:var(--cyan); text-shadow:var(--glow-c); letter-spacing:4px; margin-bottom:18px; }
+
+.term-box { width:min(560px,92vw); background:rgba(0,255,136,.04);
+  border:1px solid rgba(0,255,136,.15); border-left:3px solid var(--green);
+  padding:14px 20px; margin-bottom:22px; }
+.term-box p { font-size:12.5px; line-height:1.85; color:rgba(255,255,255,.62); letter-spacing:.8px; }
+.term-box p .g { color:var(--green); }
+.term-box p .c { color:var(--cyan); }
+
+.lvl-link {
+  display:inline-flex; align-items:center; gap:10px;
+  padding:14px 40px; border:2px solid var(--green);
+  color:var(--green); font-family:'VT323',monospace;
+  font-size:28px; letter-spacing:5px; text-decoration:none;
+  position:relative; overflow:hidden; transition:color .28s; box-shadow:var(--glow-g);
+}
+.lvl-link::before { content:''; position:absolute; inset:0;
+  background:var(--green); transform:translateX(-101%); transition:transform .26s ease; z-index:0; }
+.lvl-link span { position:relative; z-index:1; }
+.lvl-link:hover { color:var(--bg); }
+.lvl-link:hover::before { transform:translateX(0); }
+.arr { display:inline-block; transition:transform .28s; }
+.lvl-link:hover .arr { transform:translateX(7px); }
+
+/* ══════════════════════════════════════════
+   PAGE 3 — LEVEL 3 ELITE (code 22664129)
+══════════════════════════════════════════ */
+#p3 { background:radial-gradient(ellipse at 50% 22%, rgba(255,180,0,.07) 0%, transparent 62%); }
+
+.crown { font-size:52px; filter:drop-shadow(0 0 22px rgba(255,215,0,.9));
+  animation:float 3s ease-in-out infinite; margin-bottom:4px; }
+@keyframes float { 0%,100%{transform:translateY(0) rotate(-4deg)} 50%{transform:translateY(-9px) rotate(4deg)} }
+
+.omega-badge { font-size:10px; letter-spacing:9px; color:rgba(255,215,0,.55);
+  margin-bottom:12px; animation:pulse 2.5s ease-in-out infinite; }
+
+.gold-h { font-family:'VT323',monospace; font-size:clamp(50px,12vw,96px);
+  color:var(--gold); text-shadow:var(--glow-au); line-height:1;
+  animation:gpulse 3s ease-in-out infinite; }
+@keyframes gpulse { 0%,100%{text-shadow:var(--glow-au)} 50%{text-shadow:0 0 28px rgba(255,215,0,1),0 0 70px rgba(255,165,0,.5)} }
+
+.plat-h { font-family:'VT323',monospace; font-size:clamp(28px,7vw,52px);
+  color:#e8e8ff; text-shadow:0 0 16px rgba(232,232,255,.42); letter-spacing:4px; margin-bottom:6px; }
+
+.gold-sub { font-family:'VT323',monospace; font-size:clamp(17px,4vw,28px);
+  color:rgba(255,215,0,.6); letter-spacing:5px; margin-bottom:16px; }
+
+.stats { display:flex; gap:12px; justify-content:center; width:min(580px,92vw); margin-bottom:16px; }
+.stat  { flex:1; background:rgba(255,215,0,.04); border:1px solid rgba(255,215,0,.12); padding:10px 6px; text-align:center; }
+.sv    { font-family:'VT323',monospace; font-size:28px; color:var(--gold); text-shadow:0 0 12px rgba(255,215,0,.55); }
+.sl    { font-size:8px; letter-spacing:3px; color:rgba(255,215,0,.38); }
+
+.gold-term { width:min(600px,92vw); background:linear-gradient(135deg,rgba(255,215,0,.05),rgba(255,165,0,.02));
+  border:1px solid rgba(255,215,0,.18); border-left:3px solid var(--gold);
+  padding:18px 24px; margin-bottom:22px; position:relative; overflow:hidden; }
+.gold-term::after { content:'★'; position:absolute; top:-8px; right:12px;
+  font-size:70px; color:rgba(255,215,0,.04); pointer-events:none; }
+.gold-term p { font-size:12.5px; line-height:1.88; color:rgba(255,255,255,.68); letter-spacing:.8px; }
+.gold-term p .g  { color:var(--gold); }
+.gold-term p .c  { color:var(--cyan); }
+.gold-term p .w  { color:#fff; }
+.gold-term p .pl { color:#e8e8ff; }
+
+.gold-link {
+  display:inline-flex; align-items:center; gap:12px;
+  padding:14px 42px; border:2px solid var(--gold);
+  color:var(--gold); font-family:'VT323',monospace;
+  font-size:28px; letter-spacing:5px; text-decoration:none;
+  position:relative; overflow:hidden; transition:color .3s; box-shadow:var(--glow-au);
+}
+.gold-link::before { content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,var(--gold),#ffaa00);
+  transform:translateX(-101%); transition:transform .28s ease; z-index:0; }
+.gold-link span { position:relative; z-index:1; }
+.gold-link:hover { color:#0a0500; }
+.gold-link:hover::before { transform:translateX(0); }
+.gold-link:hover .arr { transform:translateX(7px); }
+
+.omega-footer { margin-top:16px; font-size:10px; letter-spacing:3px; color:rgba(255,215,0,.2); }
+
+/* ─── Particles / stars ─── */
+@keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+.ptcl { position:fixed; border-radius:50%; pointer-events:none; z-index:20; animation:rise linear forwards; }
+@keyframes rise { from{transform:translateY(0) scale(1);opacity:1} to{transform:translateY(-105vh) scale(0);opacity:0} }
+.sfx  { position:fixed; pointer-events:none; z-index:21; animation:sb linear forwards; }
+@keyframes sb    { from{transform:translate(0,0) scale(0) rotate(0deg);opacity:1} to{transform:translate(var(--dx),var(--dy)) scale(1.5) rotate(540deg);opacity:0} }
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+<div class="grid" id="grid"></div>
+<div class="scan"></div>
+
+<div class="corner tl" id="c0"></div>
+<div class="corner tr" id="c1"></div>
+<div class="corner bl" id="c2"></div>
+<div class="corner br" id="c3"></div>
+<div id="sb">SYS:ONLINE &nbsp;|&nbsp; SEC:ACTIVE &nbsp;|&nbsp; AWAITING_AUTH</div>
+
+<!-- ════════════════════════════
+     PAGE 1 — ACCESS TERMINAL
+════════════════════════════ -->
+<div class="page show" id="p1">
+
+  <div class="tag">[ SECURE TERMINAL v2.0 ]</div>
+  <div class="logo" data-t="IT CLUB">IT CLUB</div>
+  <div class="sys-sub">RESTRICTED ACCESS SYSTEM</div>
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0;width:min(520px,92vw);">
+
+    <div style="align-self:flex-start;font-size:10px;letter-spacing:6px;color:rgba(0,255,136,.38);margin-bottom:12px;">
+      // ENTER 8-DIGIT ACCESS CODE BELOW
+    </div>
+
+    <div class="drow" id="drow" onclick="rInp.focus()"></div>
+    <input class="real" type="tel" id="rInp" maxlength="8" inputmode="numeric" autocomplete="off"/>
+
+    <div class="input-note">[ CLICK THE BOXES TO START TYPING ]</div>
+    <div class="err show" id="errLine" style="opacity:0;">placeholder</div>
+
+    <button class="btn" onclick="doAuth()"><span>[ AUTHENTICATE ]</span></button>
+
+  </div>
+
+  <!-- BIG VISIBLE HINT -->
+  <div class="hint-box">
+    <div class="hint-title">── HINT ──</div>
+    <div class="hint-val">🐾 meow meow 🐾</div>
+    <div class="hint-desc">THE CODE IS HIDDEN IN THE HINT</div>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════
+     PAGE 2 — LEVEL 2
+     unlocked by: 13371337
+════════════════════════════ -->
+<div class="page" id="p2">
+  <div class="badge">[ ACCESS GRANTED — LEVEL 1 COMPLETE ]</div>
+  <div class="big-h">WELL DONE, HACKER.</div>
+  <div class="big-s">YOU CRACKED THE CODE.</div>
+
+  <div class="term-box">
+    <p>
+      <span class="g">></span> Identity verified. Clearance: <span class="g">ALPHA</span>.<br/>
+      <span class="g">></span> You found the code hidden in plain sight — not everyone does.<br/>
+      <span class="g">></span> The IT Club acknowledges your <span class="g">curiosity</span> and <span class="g">persistence</span>.<br/>
+      <span class="g">></span> You think like a hacker. That's exactly who we want.<br/>
+      <span class="g">></span> Now see if you can conquer what lies ahead...
+    </p>
+  </div>
+
+  <a href="https://youtu.be/XnFLAtXASoo?si=-xRikJ7tRpgOdYU0" target="_blank" class="lvl-link">
+    <span>▶&nbsp; LEVEL 2 &nbsp;<span class="arr">→</span></span>
+  </a>
+</div>
+
+<!-- ════════════════════════════
+     PAGE 3 — LEVEL 3 ELITE
+     unlocked by: 22664129
+════════════════════════════ -->
+<div class="page" id="p3">
+  <div class="crown">👑</div>
+  <div class="omega-badge">[ OMEGA CLEARANCE — CLASSIFIED TIER ∞ — EYES ONLY ]</div>
+  <div class="gold-h">EXTRAORDINARY.</div>
+  <div class="plat-h">YOU ARE ELITE.</div>
+  <div class="gold-sub">THE SMARTEST OF THE SMARTEST.</div>
+
+  <div class="stats">
+    <div class="stat"><div class="sv">03</div><div class="sl">LEVELS BEATEN</div></div>
+    <div class="stat"><div class="sv">∞</div><div class="sl">POTENTIAL</div></div>
+    <div class="stat"><div class="sv">Ω</div><div class="sl">CLEARANCE</div></div>
+    <div class="stat"><div class="sv">01</div><div class="sl">IN A MILLION</div></div>
+  </div>
+
+  <div class="gold-term">
+    <p>
+      <span class="g">></span> <span class="w">OMEGA PROTOCOL</span> initiated. The inner sanctum welcomes you.<br/>
+      <span class="g">></span> You didn't just find a code — you <span class="g">refused to stop searching</span>.<br/>
+      <span class="g">></span> Most people never even knew a Level 3 existed. But <span class="w">you did</span>.<br/>
+      <span class="g">></span> Your mind <span class="pl">operates on a different frequency</span> than the rest.<br/>
+      <span class="g">></span> You notice patterns, chase puzzles, and never accept a locked door.<br/>
+      <span class="g">></span> The IT Club doesn't just want coders — it wants <span class="c">legends</span>.<br/>
+      <span class="g">></span> And you? Unquestionably <span class="g">one of the sharpest minds</span> alive.<br/>
+      <span class="g">></span> <span class="w">The system has recognised you. Your legend is now on record.</span>
+    </p>
+  </div>
+
+  <!-- ⚠ REPLACE # WITH YOUR LEVEL 3 YOUTUBE LINK -->
+  <a href="#" target="_blank" class="gold-link">
+    <span>★ &nbsp;LEVEL 3 PREMIUM &nbsp;⚡ &nbsp;<span class="arr">→</span></span>
+  </a>
+
+  <div class="omega-footer">OMEGA_TOKEN: ████████████████ &nbsp;|&nbsp; RANK: LEGEND &nbsp;|&nbsp; STATUS: IMMORTALISED</div>
+</div>
+
+<script>
+/* ── Codes ── */
+const C2 = '13371337';  // → Page 2
+const C3 = '22664129';  // → Page 3
+
+/* ── Matrix rain ── */
+(function(){
+  const cv = document.getElementById('matrix'), cx = cv.getContext('2d');
+  let W, H, cols, drops, color = '#00ff88';
+  function resize(){ W=cv.width=innerWidth; H=cv.height=innerHeight; cols=Math.floor(W/20); drops=Array(cols).fill(0); }
+  resize(); window.addEventListener('resize', resize);
+  const CH = 'アイウエオカキクサシスセ0123456789ABCDEF<>/\\|{}[]!@#$%&*';
+  setInterval(function(){
+    cx.fillStyle='rgba(2,4,8,0.055)'; cx.fillRect(0,0,W,H);
+    cx.fillStyle=color; cx.font='13px Share Tech Mono';
+    for(let i=0;i<cols;i++){
+      cx.fillText(CH[Math.floor(Math.random()*CH.length)], i*20, drops[i]*20);
+      if(drops[i]*20>H && Math.random()>.978) drops[i]=0; drops[i]++;
+    }
+  }, 48);
+  window.matrixGold = function(){ color='#cc9900'; };
+})();
+
+/* ── Digit boxes ── */
+const drow = document.getElementById('drow');
+const rInp = document.getElementById('rInp');
+const boxes = [];
+
+for(let i=0;i<8;i++){
+  const d=document.createElement('div'); d.className='db'; d.id='db'+i; drow.appendChild(d); boxes.push(d);
+}
+
+function render(){
+  const v = rInp.value;
+  boxes.forEach(function(b,i){
+    b.classList.remove('cur','fill','err');
+    b.innerHTML='';
+    if(i < v.length){
+      b.textContent=v[i]; b.classList.add('fill');
+    } else if(i === v.length){
+      const c=document.createElement('div'); c.className='caret'; b.appendChild(c); b.classList.add('cur');
+    }
+  });
+}
+
+drow.addEventListener('click', function(){ rInp.focus(); render(); });
+rInp.addEventListener('focus',  render);
+rInp.addEventListener('blur',   render);
+rInp.addEventListener('input', function(){
+  rInp.value = rInp.value.replace(/\D/g,'').slice(0,8);
+  render();
+  document.getElementById('errLine').style.opacity='0';
+  sb.textContent = 'SYS:ONLINE | DIGITS: '+rInp.value.length+'/8 | AWAITING_AUTH';
+});
+rInp.addEventListener('keydown', function(e){ if(e.key==='Enter') doAuth(); });
+
+const sb = document.getElementById('sb');
+
+function flashErr(msg){
+  const e = document.getElementById('errLine');
+  e.textContent = msg; e.style.opacity='1';
+  boxes.forEach(function(b){ b.classList.add('err'); });
+  setTimeout(function(){ boxes.forEach(function(b){ b.classList.remove('err'); }); render(); }, 820);
+}
+
+/* ── Auth: one login, two destinations ── */
+function doAuth(){
+  const v = rInp.value.replace(/\D/g,'');
+  if(v.length < 8){ flashErr('⚠  CODE INCOMPLETE — ENTER ALL 8 DIGITS'); return; }
+
+  if(v === C2){
+    /* → Level 2 page */
+    sb.textContent = 'AUTH_SUCCESS | CLEARANCE: ALPHA | LEVEL_1_CLEARED';
+    burst(['#00ff88','#00e5ff','#ff2d55','#fff'], 80);
+    setTimeout(function(){ go('p1','p2'); }, 560);
+
+  } else if(v === C3){
+    /* → Level 3 page */
+    goGold();
+    burst(['#ffd700','#ffaa00','#ff8800','#fffacd','#fff'], 130);
+    stars();
+    setTimeout(function(){ go('p1','p3'); }, 860);
+
+  } else {
+    flashErr('⚠  ACCESS DENIED — INVALID CODE');
+    sb.textContent = 'AUTH_FAILED | INVALID_CODE | TRY_AGAIN';
+    setTimeout(function(){ sb.textContent='SYS:ONLINE | DIGITS: '+v.length+'/8 | AWAITING_AUTH'; }, 1400);
+  }
+}
+
+function go(from, to){
+  document.getElementById(from).classList.remove('show');
+  document.getElementById(to).classList.add('show');
+}
+
+/* ── Go gold (theme for L3) ── */
+function goGold(){
+  document.getElementById('grid').classList.add('gold');
+  sb.classList.add('gold');
+  sb.textContent = 'OMEGA_PROTOCOL_ACTIVE | ELITE_ACCESS | LEVEL_3_UNLOCKED';
+  ['c0','c1','c2','c3'].forEach(function(id){ document.getElementById(id).classList.add('gold'); });
+  window.matrixGold();
+}
+
+/* ── Particles ── */
+function burst(colors, n){
+  for(let i=0;i<n;i++){
+    const p=document.createElement('div'); p.className='ptcl';
+    const sz=2+Math.random()*7;
+    p.style.cssText='width:'+sz+'px;height:'+sz+'px;left:'+(Math.random()*100)+'vw;top:100vh;background:'+colors[Math.floor(Math.random()*colors.length)]+';animation-duration:'+(2+Math.random()*4)+'s;animation-delay:'+(Math.random()*1.4)+'s';
+    document.body.appendChild(p); setTimeout(function(){p.remove();},7000);
+  }
+}
+function stars(){
+  const em=['⭐','✨','💫','🌟','👑','⚡','🔥'];
+  for(let i=0;i<38;i++){
+    const s=document.createElement('div'); s.className='sfx';
+    s.textContent=em[Math.floor(Math.random()*em.length)];
+    s.style.fontSize=(12+Math.random()*20)+'px';
+    s.style.left=(10+Math.random()*80)+'vw'; s.style.top=(10+Math.random()*80)+'vh';
+    const a=Math.random()*Math.PI*2, d=80+Math.random()*220;
+    s.style.setProperty('--dx',(Math.cos(a)*d)+'px'); s.style.setProperty('--dy',(Math.sin(a)*d)+'px');
+    const dur=0.7+Math.random()*1.3;
+    s.style.animationDuration=dur+'s'; s.style.animationDelay=(Math.random()*.5)+'s';
+    document.body.appendChild(s); setTimeout(function(){s.remove();},(dur+0.6)*1000);
+  }
+}
+
+/* ── Focus on load ── */
+setTimeout(function(){ rInp.focus(); render(); }, 250);
+</script>
+</body>
+</html>
